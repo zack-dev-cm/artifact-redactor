@@ -62,7 +62,15 @@ class ArtifactRedactorSmokeTest(unittest.TestCase):
                 "--out",
                 str(redaction_path),
             )
-            self.run_script("check_redaction_output.py", "--root", str(safe_dir), "--out", str(check_path))
+            self.run_script(
+                "check_redaction_output.py",
+                "--root",
+                str(safe_dir),
+                "--redaction",
+                str(redaction_path),
+                "--out",
+                str(check_path),
+            )
             self.run_script(
                 "render_redaction_report.py",
                 "--scan",
@@ -83,8 +91,9 @@ class ArtifactRedactorSmokeTest(unittest.TestCase):
             report_json = (safe_dir / "report.json").read_text(encoding="utf-8")
 
             self.assertGreater(scan["finding_count"], 0)
-            self.assertEqual(check["status"], "share-ready")
+            self.assertEqual(check["status"], "manual-review-required")
             self.assertEqual(check["finding_count"], 0)
+            self.assertEqual(check["manual_review_count"], 1)
             self.assertIn("[redacted-secret]", notes)
             self.assertIn("[redacted-private-url]", notes)
             self.assertIn("[redacted-private-path]", notes)
@@ -95,8 +104,69 @@ class ArtifactRedactorSmokeTest(unittest.TestCase):
             self.assertIn("[redacted-secret]", report_json)
             self.assertFalse((safe_dir / "capture.png").exists())
             self.assertEqual(len(redaction["skipped_files"]), 1)
-            self.assertIn("Recommendation: **Share**", report)
+            self.assertIn("Recommendation: **Manual review before sharing**", report)
             self.assertIn("capture.png", report)
+
+    def test_text_only_bundle_is_share_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "raw"
+            source.mkdir()
+            (source / "notes.md").write_text(
+                "\n".join(
+                    [
+                        "Reach me at person@example.com.",
+                        "Public docs https://example.com/docs?page=2#proof can stay without the query string.",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            scan_path = tmp_path / "scan.json"
+            redaction_path = tmp_path / "redaction.json"
+            check_path = tmp_path / "check.json"
+            report_path = tmp_path / "report.md"
+            safe_dir = tmp_path / "safe"
+
+            self.run_script("scan_sensitive_text.py", "--root", str(source), "--out", str(scan_path))
+            self.run_script(
+                "redact_artifacts.py",
+                "--root",
+                str(source),
+                "--out-dir",
+                str(safe_dir),
+                "--out",
+                str(redaction_path),
+            )
+            self.run_script(
+                "check_redaction_output.py",
+                "--root",
+                str(safe_dir),
+                "--redaction",
+                str(redaction_path),
+                "--out",
+                str(check_path),
+            )
+            self.run_script(
+                "render_redaction_report.py",
+                "--scan",
+                str(scan_path),
+                "--redaction",
+                str(redaction_path),
+                "--check",
+                str(check_path),
+                "--out",
+                str(report_path),
+            )
+
+            check = json.loads(check_path.read_text(encoding="utf-8"))
+            report = report_path.read_text(encoding="utf-8")
+
+            self.assertEqual(check["status"], "share-ready")
+            self.assertEqual(check["finding_count"], 0)
+            self.assertEqual(check["manual_review_count"], 0)
+            self.assertIn("Recommendation: **Share**", report)
 
     def run_script(self, script_name: str, *args: str) -> None:
         script_path = SCRIPTS / script_name

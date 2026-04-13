@@ -33,8 +33,15 @@ def main() -> int:
     redaction = load_json(args.redaction)
     check = load_json(args.check)
 
-    recommendation = "Share" if check.get("finding_count", 0) == 0 else "Fix before sharing"
+    manual_review_count = int(check.get("manual_review_count", 0) or 0)
+    if check.get("finding_count", 0):
+        recommendation = "Fix before sharing"
+    elif manual_review_count:
+        recommendation = "Manual review before sharing"
+    else:
+        recommendation = "Share"
     counts = redaction.get("redaction_counts", {})
+    skipped_files = redaction.get("skipped_files") or []
 
     lines = [
         "# Artifact Redaction Report",
@@ -43,7 +50,8 @@ def main() -> int:
         f"- Original findings: **{scan.get('finding_count', 0)}**",
         f"- Output findings: **{check.get('finding_count', 0)}**",
         f"- Processed text files: **{redaction.get('processed_files', 0)}**",
-        f"- Skipped files: **{len(redaction.get('skipped_files', []))}**",
+        f"- Manual-review files: **{manual_review_count}**",
+        f"- Skipped files: **{len(skipped_files)}**",
         "",
         "## Redactions Applied",
         "",
@@ -71,8 +79,9 @@ def main() -> int:
             lines.append(f"- `{item.get('severity')}` `{item.get('code')}` {item.get('file')}:{item.get('line')}: {item.get('snippet')}")
     else:
         lines.append("- No obvious sensitive text patterns remain in processed text files.")
+        if manual_review_count:
+            lines.append(f"- {manual_review_count} skipped file(s) still require manual review before sharing the full bundle.")
 
-    skipped_files = redaction.get("skipped_files") or []
     lines.extend(["", "## Manual Review", ""])
     if skipped_files:
         for item in skipped_files[:10]:
@@ -91,4 +100,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

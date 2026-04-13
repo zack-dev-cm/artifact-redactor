@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that the redacted output is ready to share."""
+"""Verify the redacted output and surface any remaining manual-review items."""
 
 from __future__ import annotations
 
@@ -10,13 +10,36 @@ from pathlib import Path
 from redaction_common import find_line_findings, iter_candidate_files, read_text_if_supported
 
 
+def load_manual_review_items(path: Path | None) -> list[dict[str, str]]:
+    if path is None:
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return []
+
+    items: list[dict[str, str]] = []
+    for item in payload.get("skipped_files") or []:
+        if isinstance(item, dict):
+            file_name = str(item.get("file") or "").strip()
+            reason = str(item.get("reason") or "manual-review-required").strip()
+        else:
+            file_name = str(item).strip()
+            reason = "manual-review-required"
+        if file_name:
+            items.append({"file": file_name, "reason": reason})
+    return items
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, help="Redacted output directory or file.")
+    parser.add_argument("--redaction", help="Optional redaction JSON report used to surface skipped files as manual-review items.")
     parser.add_argument("--out", required=True, help="Output JSON report path.")
     args = parser.parse_args()
 
     root = Path(args.root).expanduser().resolve()
+    redaction_path = Path(args.redaction).expanduser().resolve() if args.redaction else None
     out_path = Path(args.out).expanduser().resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -42,16 +65,25 @@ def main() -> int:
                 }
             )
 
+    manual_review_files = load_manual_review_items(redaction_path)
     error_count = sum(1 for item in findings if item["severity"] == "error")
     warning_count = sum(1 for item in findings if item["severity"] == "warning")
+    if findings:
+        status = "fix-required"
+    elif manual_review_files:
+        status = "manual-review-required"
+    else:
+        status = "share-ready"
     payload = {
         "root": str(root),
         "scanned_files": scanned_files,
         "skipped_files": skipped_files,
+        "manual_review_files": manual_review_files,
+        "manual_review_count": len(manual_review_files),
         "finding_count": len(findings),
         "error_count": error_count,
         "warning_count": warning_count,
-        "status": "share-ready" if not findings else "fix-required",
+        "status": status,
         "findings": findings,
     }
     out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -61,4 +93,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
