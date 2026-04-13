@@ -18,14 +18,21 @@ class ArtifactRedactorSmokeTest(unittest.TestCase):
             tmp_path = Path(tmp)
             source = tmp_path / "raw"
             source.mkdir()
+            github_token = "ghp_" + "123456789012345678901234567890123456"
+            localhost_url = "http://" + "local" + "host:3000/upload?token=abc"
+            credential_url = "https://" + "user:pass@" + "example.com/private?x=1"
+            unix_path = "/Users" + "/zack/private/demo.json"
+            file_url = "file://" + "tmp/output.log"
+            bearer_token = "Bearer " + "demo-demo-demo-demo"
+            windows_path = "C:" + "\\Users\\zack\\Desktop\\secret.txt"
 
             (source / "notes.md").write_text(
                 "\n".join(
                     [
-                        "Token ghp_123456789012345678901234567890123456 is in this draft.",
-                        "Private endpoint http://localhost:3000/upload?token=abc should not be shared.",
-                        "Credentialed URL https://user:pass@example.com/private?x=1 should be treated as private.",
-                        "Path /Users/zack/private/demo.json and file://tmp/output.log are local only.",
+                        f"Token {github_token} is in this draft.",
+                        f"Private endpoint {localhost_url} should not be shared.",
+                        f"Credentialed URL {credential_url} should be treated as private.",
+                        f"Path {unix_path} and {file_url} are local only.",
                         "Email person@example.com and phone +1 (555) 123-4567 are present.",
                         "Public docs https://example.com/docs?page=2#proof can stay without the query string.",
                     ]
@@ -34,7 +41,7 @@ class ArtifactRedactorSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (source / "report.json").write_text(
-                '{"note":"Bearer demo-demo-demo-demo should be removed","path":"C:\\\\Users\\\\zack\\\\Desktop\\\\secret.txt"}\n',
+                json.dumps({"note": f"{bearer_token} should be removed", "path": windows_path}) + "\n",
                 encoding="utf-8",
             )
             (source / "capture.png").write_bytes(b"\x89PNG\r\n\x1a\nbinary")

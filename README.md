@@ -74,11 +74,10 @@ python3 skill/artifact-redactor/scripts/render_redaction_report.py \
 
 ## Limits
 
-- binary files, screenshots, and PDFs are not auto-redacted in `v1.0.0`
+- binary files, screenshots, and PDFs are not auto-redacted in `v1.0.1`
 - the scanner uses conservative heuristics; some manual review is still required
 - placeholder redaction is designed for sharing safety, not forensic reversibility
 
 ## License
 
 MIT
-
