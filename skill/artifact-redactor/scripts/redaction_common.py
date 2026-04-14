@@ -6,6 +6,7 @@ from __future__ import annotations
 import ipaddress
 import re
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urlsplit, urlunsplit
 
 TEXT_SUFFIXES = {
@@ -62,7 +63,7 @@ def is_text_candidate(path: Path) -> bool:
     return path.name.lower() in {"license", "readme", ".gitignore"}
 
 
-def read_text_if_supported(path: Path) -> str | None:
+def read_text_if_supported(path: Path) -> Optional[str]:
     if not is_text_candidate(path):
         return None
     try:

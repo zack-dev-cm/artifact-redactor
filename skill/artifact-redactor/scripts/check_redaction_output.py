@@ -6,19 +6,29 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import List
 
 from redaction_common import find_line_findings, iter_candidate_files, read_text_if_supported
 
 
-def load_manual_review_items(path: Path | None) -> list[dict[str, str]]:
-    if path is None:
-        return []
+def require_existing_path(parser: argparse.ArgumentParser, raw_path: str, label: str) -> Path:
+    path = Path(raw_path).expanduser().resolve()
+    if not path.exists():
+        parser.error(f"{label} does not exist: {path}")
+    return path
+
+
+def load_manual_review_items(path: Path) -> List[dict[str, str]]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return []
+    except OSError as exc:
+        raise ValueError(f"Unable to read --redaction report: {path}") from exc
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"--redaction report is not valid UTF-8: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"--redaction report is not valid JSON: {path}") from exc
 
-    items: list[dict[str, str]] = []
+    items: List[dict[str, str]] = []
     for item in payload.get("skipped_files") or []:
         if isinstance(item, dict):
             file_name = str(item.get("file") or "").strip()
@@ -34,12 +44,12 @@ def load_manual_review_items(path: Path | None) -> list[dict[str, str]]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, help="Redacted output directory or file.")
-    parser.add_argument("--redaction", help="Optional redaction JSON report used to surface skipped files as manual-review items.")
+    parser.add_argument("--redaction", required=True, help="Redaction JSON report used to surface skipped files as manual-review items.")
     parser.add_argument("--out", required=True, help="Output JSON report path.")
     args = parser.parse_args()
 
-    root = Path(args.root).expanduser().resolve()
-    redaction_path = Path(args.redaction).expanduser().resolve() if args.redaction else None
+    root = require_existing_path(parser, args.root, "--root")
+    redaction_path = require_existing_path(parser, args.redaction, "--redaction")
     out_path = Path(args.out).expanduser().resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -65,7 +75,10 @@ def main() -> int:
                 }
             )
 
-    manual_review_files = load_manual_review_items(redaction_path)
+    try:
+        manual_review_files = load_manual_review_items(redaction_path)
+    except ValueError as exc:
+        parser.error(str(exc))
     error_count = sum(1 for item in findings if item["severity"] == "error")
     warning_count = sum(1 for item in findings if item["severity"] == "warning")
     if findings:

@@ -10,13 +10,20 @@ from pathlib import Path
 from redaction_common import find_line_findings, iter_candidate_files, read_text_if_supported
 
 
+def require_existing_path(parser: argparse.ArgumentParser, raw_path: str, label: str) -> Path:
+    path = Path(raw_path).expanduser().resolve()
+    if not path.exists():
+        parser.error(f"{label} does not exist: {path}")
+    return path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, help="Root file or directory to scan.")
     parser.add_argument("--out", required=True, help="Output JSON file.")
     args = parser.parse_args()
 
-    root = Path(args.root).expanduser().resolve()
+    root = require_existing_path(parser, args.root, "--root")
     out_path = Path(args.out).expanduser().resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -60,4 +67,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

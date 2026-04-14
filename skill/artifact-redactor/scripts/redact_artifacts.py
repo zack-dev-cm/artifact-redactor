@@ -15,6 +15,13 @@ def merge_counts(total: dict[str, int], current: dict[str, int]) -> None:
         total[key] = total.get(key, 0) + int(value)
 
 
+def require_existing_path(parser: argparse.ArgumentParser, raw_path: str, label: str) -> Path:
+    path = Path(raw_path).expanduser().resolve()
+    if not path.exists():
+        parser.error(f"{label} does not exist: {path}")
+    return path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, help="Source file or directory.")
@@ -22,7 +29,7 @@ def main() -> int:
     parser.add_argument("--out", required=True, help="Output JSON report path.")
     args = parser.parse_args()
 
-    root = Path(args.root).expanduser().resolve()
+    root = require_existing_path(parser, args.root, "--root")
     out_dir = Path(args.out_dir).expanduser().resolve()
     report_path = Path(args.out).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -74,4 +81,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

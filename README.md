@@ -7,6 +7,8 @@ artifact bundles safer. It scans text files for obvious leak patterns, writes a 
 artifacts into a clean output directory, checks the processed text output, surfaces skipped files as
 manual-review items, and renders a concise markdown report.
 
+Requires Python 3.9+.
+
 Binary files are not rewritten. They are flagged for manual review so the tool stays honest about what
 it can and cannot sanitize automatically.
 
@@ -87,7 +89,7 @@ python3 skill/artifact-redactor/scripts/render_redaction_report.py \
 
 ## Limits
 
-- binary files, screenshots, and PDFs are not auto-redacted in `v1.0.2`
+- binary files, screenshots, and PDFs are not auto-redacted in `v1.0.3`
 - the scanner uses conservative heuristics; some manual review is still required
 - placeholder redaction is designed for sharing safety, not forensic reversibility
 

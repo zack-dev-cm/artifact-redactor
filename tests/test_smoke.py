@@ -172,6 +172,58 @@ class ArtifactRedactorSmokeTest(unittest.TestCase):
         script_path = SCRIPTS / script_name
         subprocess.run([sys.executable, str(script_path), *args], check=True, cwd=REPO_ROOT)
 
+    def run_script_result(self, script_name: str, *args: str) -> subprocess.CompletedProcess[str]:
+        script_path = SCRIPTS / script_name
+        return subprocess.run(
+            [sys.executable, str(script_path), *args],
+            check=False,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_missing_root_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            missing_root = tmp_path / "missing"
+            result = self.run_script_result(
+                "scan_sensitive_text.py",
+                "--root",
+                str(missing_root),
+                "--out",
+                str(tmp_path / "scan.json"),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--root does not exist", result.stderr)
+
+    def test_check_requires_redaction_and_existing_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            safe_dir = tmp_path / "safe"
+            safe_dir.mkdir()
+
+            missing_redaction = self.run_script_result(
+                "check_redaction_output.py",
+                "--root",
+                str(safe_dir),
+                "--redaction",
+                str(tmp_path / "missing.json"),
+                "--out",
+                str(tmp_path / "check.json"),
+            )
+            self.assertNotEqual(missing_redaction.returncode, 0)
+            self.assertIn("--redaction does not exist", missing_redaction.stderr)
+
+            omitted_redaction = self.run_script_result(
+                "check_redaction_output.py",
+                "--root",
+                str(safe_dir),
+                "--out",
+                str(tmp_path / "check.json"),
+            )
+            self.assertNotEqual(omitted_redaction.returncode, 0)
+            self.assertIn("--redaction", omitted_redaction.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

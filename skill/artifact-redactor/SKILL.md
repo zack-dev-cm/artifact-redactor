@@ -19,6 +19,7 @@ Take a directory or file full of text artifacts and produce a safer share bundle
 
 This skill is for text artifacts such as Markdown, JSON, logs, YAML, CSV, shell output, and similar files.
 It does not claim to sanitize screenshots, PDFs, or other binary files.
+It requires Python 3.9+.
 
 ## Use This Skill When
 
