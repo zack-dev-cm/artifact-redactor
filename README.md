@@ -95,4 +95,4 @@ python3 skill/artifact-redactor/scripts/render_redaction_report.py \
 
 ## License
 
-MIT
+MIT No Attribution (MIT-0)
