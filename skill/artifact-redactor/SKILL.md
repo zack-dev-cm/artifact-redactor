@@ -2,6 +2,7 @@
 name: artifact-redactor
 description: Public OpenClaw skill for redacting private paths, secret-like strings, private URLs, and common PII from Markdown, JSON, logs, and other text artifacts before sharing.
 homepage: https://github.com/zack-dev-cm/artifact-redactor
+license: MIT
 user-invocable: true
 metadata: {"openclaw":{"homepage":"https://github.com/zack-dev-cm/artifact-redactor","skillKey":"artifact-redactor","requires":{"anyBins":["python3","python"]}}}
 ---
