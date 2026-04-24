@@ -168,6 +168,122 @@ class ArtifactRedactorSmokeTest(unittest.TestCase):
             self.assertEqual(check["manual_review_count"], 0)
             self.assertIn("Recommendation: **Share**", report)
 
+    def test_check_marks_new_skipped_output_files_for_manual_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "raw"
+            source.mkdir()
+            (source / "notes.md").write_text("Public docs https://example.com/docs?page=2#proof\n", encoding="utf-8")
+
+            redaction_path = tmp_path / "redaction.json"
+            check_path = tmp_path / "check.json"
+            safe_dir = tmp_path / "safe"
+
+            self.run_script(
+                "redact_artifacts.py",
+                "--root",
+                str(source),
+                "--out-dir",
+                str(safe_dir),
+                "--out",
+                str(redaction_path),
+            )
+            (safe_dir / "stale.bin").write_bytes(b"stale")
+            self.run_script(
+                "check_redaction_output.py",
+                "--root",
+                str(safe_dir),
+                "--redaction",
+                str(redaction_path),
+                "--out",
+                str(check_path),
+            )
+
+            check = json.loads(check_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(check["status"], "manual-review-required")
+            self.assertEqual(check["manual_review_count"], 1)
+            self.assertEqual(check["skipped_files"], ["stale.bin"])
+            self.assertEqual(
+                check["manual_review_files"],
+                [{"file": "stale.bin", "reason": "binary-or-unsupported-output"}],
+            )
+
+    def test_redaction_rejects_dirty_or_overlapping_output_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "raw"
+            source.mkdir()
+            (source / "notes.md").write_text("hello\n", encoding="utf-8")
+
+            dirty_safe_dir = tmp_path / "safe"
+            dirty_safe_dir.mkdir()
+            (dirty_safe_dir / "old.txt").write_text("old\n", encoding="utf-8")
+            dirty_result = self.run_script_result(
+                "redact_artifacts.py",
+                "--root",
+                str(source),
+                "--out-dir",
+                str(dirty_safe_dir),
+                "--out",
+                str(tmp_path / "dirty-redaction.json"),
+            )
+            self.assertNotEqual(dirty_result.returncode, 0)
+            self.assertIn("--out-dir must be empty", dirty_result.stderr)
+
+            nested_safe_dir = source / "safe"
+            overlap_result = self.run_script_result(
+                "redact_artifacts.py",
+                "--root",
+                str(source),
+                "--out-dir",
+                str(nested_safe_dir),
+                "--out",
+                str(tmp_path / "overlap-redaction.json"),
+            )
+            self.assertNotEqual(overlap_result.returncode, 0)
+            self.assertIn("--out-dir must not overlap with --root", overlap_result.stderr)
+
+    def test_redacts_internal_hosts_and_common_private_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "raw"
+            source.mkdir()
+            unc_path = "\\\\" + "fileserver\\share\\secret.txt"
+            (source / "notes.md").write_text(
+                "\n".join(
+                    [
+                        "Internal URL http://buildbox/status?token=1 should not be shared.",
+                        "Paths /opt/service/secret.txt and /workspace/job/output.log must be removed.",
+                        f"Also redact /mnt/data/private.csv and {unc_path}.",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            redaction_path = tmp_path / "redaction.json"
+            safe_dir = tmp_path / "safe"
+            self.run_script(
+                "redact_artifacts.py",
+                "--root",
+                str(source),
+                "--out-dir",
+                str(safe_dir),
+                "--out",
+                str(redaction_path),
+            )
+
+            notes = (safe_dir / "notes.md").read_text(encoding="utf-8")
+
+            self.assertIn("[redacted-private-url]", notes)
+            self.assertEqual(notes.count("[redacted-private-path]"), 4)
+            self.assertNotIn("buildbox", notes)
+            self.assertNotIn("/opt/service/secret.txt", notes)
+            self.assertNotIn("/workspace/job/output.log", notes)
+            self.assertNotIn("/mnt/data/private.csv", notes)
+            self.assertNotIn(unc_path, notes)
+
     def run_script(self, script_name: str, *args: str) -> None:
         script_path = SCRIPTS / script_name
         subprocess.run([sys.executable, str(script_path), *args], check=True, cwd=REPO_ROOT)

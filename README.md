@@ -32,34 +32,36 @@ it can and cannot sanitize automatically.
 ## Quick Start
 
 ```bash
-mkdir -p /tmp/artifact-redactor-demo
+mkdir -p artifact-redactor-demo
 
-cat > /tmp/artifact-redactor-demo/notes.md <<'EOF'
+cat > artifact-redactor-demo/notes.md <<'EOF'
 Contact person@example.com or +1 555 123 4567.
 Public docs https://example.com/docs?page=2#proof can stay without the query string.
-Local trace /tmp/private-trace.log should not be shared.
+Token ghp_not_real should not be shared.
 EOF
 
 python3 skill/artifact-redactor/scripts/scan_sensitive_text.py \
-  --root /tmp/artifact-redactor-demo \
-  --out /tmp/artifact-redactor-scan.json
+  --root artifact-redactor-demo \
+  --out artifact-redactor-scan.json
 
 python3 skill/artifact-redactor/scripts/redact_artifacts.py \
-  --root /tmp/artifact-redactor-demo \
-  --out-dir /tmp/artifact-redactor-safe \
-  --out /tmp/artifact-redactor-redaction.json
+  --root artifact-redactor-demo \
+  --out-dir artifact-redactor-safe \
+  --out artifact-redactor-redaction.json
 
 python3 skill/artifact-redactor/scripts/check_redaction_output.py \
-  --root /tmp/artifact-redactor-safe \
-  --redaction /tmp/artifact-redactor-redaction.json \
-  --out /tmp/artifact-redactor-check.json
+  --root artifact-redactor-safe \
+  --redaction artifact-redactor-redaction.json \
+  --out artifact-redactor-check.json
 
 python3 skill/artifact-redactor/scripts/render_redaction_report.py \
-  --scan /tmp/artifact-redactor-scan.json \
-  --redaction /tmp/artifact-redactor-redaction.json \
-  --check /tmp/artifact-redactor-check.json \
-  --out /tmp/artifact-redactor-report.md
+  --scan artifact-redactor-scan.json \
+  --redaction artifact-redactor-redaction.json \
+  --check artifact-redactor-check.json \
+  --out artifact-redactor-report.md
 ```
+
+Use an empty output directory outside the source root for `--out-dir`; the tool now rejects overlapping or pre-populated output locations to avoid stale-file bleed.
 
 ## What It Covers
 
@@ -92,6 +94,10 @@ python3 skill/artifact-redactor/scripts/render_redaction_report.py \
 - binary files, screenshots, and PDFs are not auto-redacted in `v1.0.3`
 - the scanner uses conservative heuristics; some manual review is still required
 - placeholder redaction is designed for sharing safety, not forensic reversibility
+
+## Security
+
+Report suspected leak or redaction failures privately through [SECURITY.md](SECURITY.md) instead of opening a public issue first.
 
 ## License
 
